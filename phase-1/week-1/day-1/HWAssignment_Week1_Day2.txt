@@ -1,0 +1,14 @@
+Activities
+
+
+1) Find 10 different model providers and their models released in last 12 months
+
+    Ex: OpenAI - 5.5 - Release Date: April 2026 - Cut off Date - Nov 2025 - Cost of tokens - Context Window
+        Public model
+        When to use this model : Reasoning !!
+
+2) Read 2-3 articles about how transformer works?
+
+    - Goal to understand the self attention mechanism, vector embedding, feed forward
+
+3) Connect with your group learners and connect with their linkedin profiles
