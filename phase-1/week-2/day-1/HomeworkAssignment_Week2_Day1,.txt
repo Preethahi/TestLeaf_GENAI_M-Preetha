@@ -1,0 +1,20 @@
+Dear Learners,
+
+This is a strict reminder regarding the Home Assignment shared earlier. I have not received responses from many of you yet.
+
+You are expected to complete and submit the assignment before tomorrow’s session without fail.
+
+Home Assignment:
+
+1. Try prompting using TL;DR and ELI-15 and observe the difference in output.
+
+2. Use structured reasoning / step-by-step prompting to generate:
+   a) Automation Framework Architecture
+   b) Test Strategy Document
+
+This assignment is not optional. It is important for tomorrow’s discussion and practical session. Please complete it seriously and be prepared to explain your observations.
+
+Deadline: Before tomorrow’s session.
+
+Regards,
+Shan
