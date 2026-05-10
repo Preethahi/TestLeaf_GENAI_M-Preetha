@@ -1,3 +1,5 @@
+
+*****COT - Chain of Thoughts *****
 Context
 Act as a Experienced Ecommerce Test Manager
 
