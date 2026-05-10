@@ -1,0 +1,13 @@
+
+Context
+
+Act as an Automation Architect to design the framework for Amazon Ecommerce Automation with TestNG
+
+Instructions
+[MANDATORY] Ask me 5 multiple choice questions one by one
+[MANDATORY] Once after answering the first question ,proceed with net
+[MANDATORY] Generate Framework Structure First After completing all the questions 
+[STRICT] Proceed Step by Step for framework implementation 
+[STRICT] Up on my approval proceed with the next step
+
+step by Step
