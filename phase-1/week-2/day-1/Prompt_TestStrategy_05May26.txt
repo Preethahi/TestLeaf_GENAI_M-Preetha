@@ -1,0 +1,9 @@
+Context
+Act as a Experienced Ecommerce Test Manager
+
+Instruction
+
+Design a Test strategy document for Amazon application Payment Module
+[MANDATORY] Ask me 5 valid multiple choice questions one by one
+[STRICTLY] ONCE AFTER ANSWERING THE FIRST QUESTION Go with next question
+[CRITICAL]Once after answering all questions generate Test strategy document in .docx format
