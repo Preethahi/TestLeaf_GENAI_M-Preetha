@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Visual Comparison Report — nf_bb55c3</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 2rem; background: #f5f6f8; color: #1a1a1a; }
+  .container { max-width: 960px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 2rem; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+  h1 { font-size: 1.4rem; margin-top: 0; }
+  .meta { color: #666; font-size: 0.9rem; margin-bottom: 1.5rem; }
+  .score-panel { display: flex; align-items: center; gap: 1.5rem; padding: 1.25rem; border-radius: 8px; background: #fafafa; border: 1px solid #eee; margin-bottom: 1.5rem; }
+  .score-numeric { font-size: 2.5rem; font-weight: 700; }
+  .score-band { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 999px; color: #fff; font-weight: 600; background: #ffc107; }
+  .narrative { line-height: 1.5; margin-bottom: 1.5rem; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 2rem; }
+  th, td { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+  th { background: #fafafa; }
+  .empty { color: #888; font-style: italic; }
+  .severity-pill { padding: 0.15rem 0.6rem; border-radius: 999px; color: #fff; font-size: 0.8rem; text-transform: capitalize; }
+  .severity-low { background: #4caf50; }
+  .severity-medium { background: #ffc107; }
+  .severity-high { background: #ff7043; }
+  .severity-critical { background: #d32f2f; }
+  .chart-wrap { max-width: 360px; margin: 0 auto 2rem; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>Visual Comparison Report</h1>
+    <div class="meta">Comparison ID: nf_bb55c3 &middot; Mode: new-feature</div>
+
+    <div class="score-panel">
+      <div class="score-numeric">36</div>
+      <div><span class="score-band">Medium</span></div>
+    </div>
+
+    <p class="narrative">The screenshot of the new feature shows some noticeable issues with alignment and spacing, including inconsistent label and field alignment for radio buttons and spacing between form elements, as well as inconsistent capitalization in field labels and descriptions. These issues detract from the overall usability and visual appeal of the feature. While not critical, these problems should be addressed to improve the user experience. The feature is generally functional but requires refinement.</p>
+
+    <div class="chart-wrap">
+      <canvas id="severityChart" width="360" height="360"></canvas>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>Category</th><th>Description</th><th>Severity</th></tr>
+      </thead>
+      <tbody>
+        
+        <tr>
+          <td>alignment</td>
+          <td>Inconsistent label and field alignment for &#39;Preferred contact&#39; radio buttons</td>
+          <td><span class="severity-pill severity-medium">medium</span></td>
+        </tr>
+        <tr>
+          <td>spacing</td>
+          <td>Inconsistent spacing between &#39;Terms accepted&#39; checkbox and other form elements</td>
+          <td><span class="severity-pill severity-low">low</span></td>
+        </tr>
+        <tr>
+          <td>text</td>
+          <td>Some field labels and descriptions have inconsistent capitalization</td>
+          <td><span class="severity-pill severity-low">low</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    (function () {
+      var ctx = document.getElementById('severityChart').getContext('2d');
+      var labels = ["low","medium"];
+      var counts = [2,1];
+      var colors = ["#4caf50","#ffc107"];
+      if (labels.length === 0) return;
+      new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: labels,
+          datasets: [{ data: counts, backgroundColor: colors }]
+        },
+        options: {
+          plugins: {
+            title: { display: true, text: 'Findings by Severity' },
+            legend: { position: 'bottom' }
+          }
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
