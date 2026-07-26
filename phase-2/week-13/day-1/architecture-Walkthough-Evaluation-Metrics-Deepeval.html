@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Architecture Walkthrough — Testleaf LLM Evaluation Framework (DeepEval)</title>
+<style>
+  :root {
+    --bg: #f6f7fb;
+    --bg-alt: #ffffff;
+    --text: #1b1f2a;
+    --text-dim: #565f73;
+    --border: #dde1ea;
+    --accent: #6355ff;
+    --accent-2: #0ea5a0;
+    --accent-3: #e0862f;
+    --danger: #c4462b;
+    --code-bg: #eef0f6;
+    --shadow: 0 1px 2px rgba(20,20,40,0.04), 0 4px 16px rgba(20,20,40,0.06);
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14151c;
+      --bg-alt: #1b1d27;
+      --text: #e7e9f2;
+      --text-dim: #9aa1b5;
+      --border: #2c2f3e;
+      --accent: #9b8cff;
+      --accent-2: #3fd6cf;
+      --accent-3: #ffb15c;
+      --danger: #ff8a6b;
+      --code-bg: #22242f;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+  }
+  header.hero {
+    padding: 64px 24px 40px;
+    text-align: center;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(99,85,255,0.15), transparent 45%),
+      radial-gradient(circle at 80% 0%, rgba(14,165,160,0.12), transparent 40%);
+    border-bottom: 1px solid var(--border);
+  }
+  header.hero .eyebrow {
+    display: inline-block;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 14px;
+  }
+  header.hero h1 {
+    font-size: clamp(28px, 4vw, 42px);
+    margin: 0 0 12px;
+    letter-spacing: -0.02em;
+  }
+  header.hero p.sub {
+    color: var(--text-dim);
+    max-width: 680px;
+    margin: 0 auto;
+    font-size: 16px;
+  }
+  .badges { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 22px; }
+  .badge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+
+  nav.toc {
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin: -28px auto 48px;
+    max-width: 1032px;
+    padding: 20px 24px;
+    position: relative;
+    z-index: 2;
+  }
+  nav.toc h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin: 0 0 12px; }
+  nav.toc ol { columns: 2; column-gap: 32px; margin: 0; padding-left: 20px; font-size: 14px; }
+  nav.toc li { margin-bottom: 6px; }
+  nav.toc a { color: var(--text); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); text-decoration: underline; }
+
+  section { margin: 56px 0; }
+  section h2 {
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+    scroll-margin-top: 20px;
+  }
+  section h2 .num {
+    font-size: 13px;
+    width: 26px; height: 26px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--accent);
+    color: white;
+    border-radius: 8px;
+    flex: none;
+  }
+  section h3 { font-size: 16px; margin: 28px 0 10px; color: var(--text); }
+  p { color: var(--text-dim); }
+  section > p:first-of-type { margin-top: 0; }
+  strong { color: var(--text); }
+  code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-size: 0.88em;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    color: var(--accent);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  pre code { background: none; padding: 0; color: var(--text); }
+
+  .card {
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+  }
+
+  /* ---------- Architecture diagram ---------- */
+  .arch-diagram {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    overflow-x: auto;
+    padding: 8px 4px 18px;
+  }
+  .arch-node {
+    flex: 1 1 0;
+    min-width: 190px;
+    background: var(--bg-alt);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 16px;
+    text-align: center;
+    box-shadow: var(--shadow);
+    position: relative;
+  }
+  .arch-node .icon { font-size: 26px; margin-bottom: 8px; display: block; }
+  .arch-node .title { font-weight: 700; font-size: 14.5px; margin-bottom: 4px; }
+  .arch-node .port {
+    display: inline-block;
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--accent);
+    background: rgba(99,85,255,0.1);
+    border-radius: 6px;
+    padding: 2px 8px;
+    margin-top: 4px;
+  }
+  .arch-node .detail { font-size: 12px; color: var(--text-dim); margin-top: 8px; }
+  .arch-node.frontend { border-top: 4px solid var(--accent-2); }
+  .arch-node.backend { border-top: 4px solid var(--accent); }
+  .arch-node.sidecar { border-top: 4px solid var(--accent-3); }
+  .arch-node.llm { border-top: 4px solid var(--danger); }
+  .arch-arrow {
+    flex: 0 0 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 11px;
+    text-align: center;
+    padding: 0 4px;
+  }
+  .arch-arrow .line { font-size: 22px; line-height: 1; color: var(--accent); }
+  .arch-arrow span.label { display: block; margin-top: 4px; white-space: nowrap; }
+
+  /* ---------- Fan-out diagram (routes) ---------- */
+  .fanout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .fanout-row {
+    display: grid;
+    grid-template-columns: 1.1fr 24px 1.3fr 24px 1.3fr;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13.5px;
+  }
+  .fanout-row .cell { overflow-wrap: anywhere; }
+  .fanout-row .cell.page { font-weight: 700; }
+  .fanout-row .cell code { display: inline-block; }
+  .fanout-row .arrow { color: var(--accent); text-align: center; font-size: 16px; }
+  .fanout-head {
+    display: grid;
+    grid-template-columns: 1.1fr 24px 1.3fr 24px 1.3fr;
+    gap: 6px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    padding: 0 14px;
+    margin-bottom: 4px;
+  }
+
+  /* ---------- Step flow (vertical numbered timeline) ---------- */
+  .steps {
+    position: relative;
+    margin-left: 6px;
+    padding-left: 34px;
+    border-left: 2px solid var(--border);
+  }
+  .step { position: relative; padding-bottom: 22px; }
+  .step:last-child { padding-bottom: 0; }
+  .step .dot {
+    position: absolute;
+    left: -42px;
+    top: 0;
+    width: 26px; height: 26px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12.5px; font-weight: 700;
+    box-shadow: 0 0 0 4px var(--bg-alt);
+  }
+  .step .file {
+    display: inline-block;
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    background: var(--code-bg);
+    color: var(--accent-2);
+    padding: 1px 8px;
+    border-radius: 6px;
+    margin-bottom: 4px;
+  }
+  .step p { margin: 4px 0 0; }
+  .step p:first-of-type { margin-top: 2px; }
+
+  .flow-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 36px 0 14px;
+  }
+  .flow-title .tag {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+  }
+  .flow-title h3 { margin: 0; font-size: 17px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th { background: var(--code-bg); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); }
+  tr:last-child td { border-bottom: none; }
+  .table-wrap { overflow-x: auto; border-radius: 12px; }
+  .lower-better { color: var(--danger); font-weight: 600; }
+  .higher-better { color: var(--accent-2); font-weight: 600; }
+
+  .callout {
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    background: var(--bg-alt);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 13.5px;
+    margin: 14px 0;
+  }
+  .callout.warn { border-left-color: var(--danger); }
+  .callout strong { display: block; margin-bottom: 4px; }
+
+  .gaps { display: grid; gap: 10px; }
+  .gap-item {
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--danger);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13.5px;
+  }
+
+  .tree {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12.8px;
+    line-height: 1.7;
+    white-space: pre;
+  }
+  .tree .c1 { color: var(--accent); }
+  .tree .c2 { color: var(--accent-2); }
+  .tree .c3 { color: var(--text-dim); }
+
+  .flag-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+  }
+  .flag-card {
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .flag-card code { display: block; margin-bottom: 6px; font-size: 12.5px; }
+  .flag-card .desc { font-size: 12.5px; color: var(--text-dim); }
+
+  footer {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 12.5px;
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 720px) {
+    .arch-diagram { flex-direction: column; }
+    .arch-arrow { flex-direction: row; transform: rotate(90deg); height: 40px; }
+    nav.toc ol { columns: 1; }
+    .fanout-row, .fanout-head { grid-template-columns: 1fr; }
+    .fanout-row .arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <span class="eyebrow">Architecture Walkthrough</span>
+  <h1>Testleaf LLM Evaluation Framework<br>(DeepEval)</h1>
+  <p class="sub">A line-by-line trace of how a request moves through the React frontend,
+  Express gateway, and Python/FastAPI DeepEval sidecar — for every evaluation flow the app supports.</p>
+  <div class="badges">
+    <span class="badge">React + Vite + TS</span>
+    <span class="badge">Express + TypeScript</span>
+    <span class="badge">FastAPI + Python</span>
+    <span class="badge">DeepEval metrics</span>
+    <span class="badge">Groq / OpenAI</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#overview">System overview</a></li>
+    <li><a href="#topology">Runtime topology &amp; ports</a></li>
+    <li><a href="#dirmap">Directory map</a></li>
+    <li><a href="#core">Core abstraction: MetricEvaluator</a></li>
+    <li><a href="#routes">Feature → route → sidecar map</a></li>
+    <li><a href="#single">Flow: single-turn evaluation</a></li>
+    <li><a href="#multi">Flow: multi-turn evaluation</a></li>
+    <li><a href="#custom">Flow: custom metrics (G-Eval)</a></li>
+    <li><a href="#golden">Flow: golden dataset generation</a></li>
+    <li><a href="#batch">Flow: batch evaluation</a></li>
+    <li><a href="#flags">Feature flags</a></li>
+    <li><a href="#metrics">Metrics reference</a></li>
+    <li><a href="#gaps">Known gaps</a></li>
+  </ol>
+</nav>
+
+<section id="overview">
+  <h2><span class="num">1</span> System overview</h2>
+  <p>A three-tier app that scores LLM/RAG outputs using DeepEval metrics — an
+  "LLM-as-judge" approach where a Groq or OpenAI model evaluates another model's output.
+  The React SPA collects inputs, the Express gateway validates and forwards them, and the
+  Python/FastAPI sidecar does the actual evaluation by calling DeepEval's metric classes.</p>
+
+  <div class="arch-diagram">
+    <div class="arch-node frontend">
+      <span class="icon">🖥️</span>
+      <div class="title">Frontend (Vite)</div>
+      <div class="detail">React + TypeScript SPA</div>
+      <span class="port">:5174</span>
+    </div>
+    <div class="arch-arrow"><span class="line">→</span><span class="label">HTTP<br>JSON</span></div>
+    <div class="arch-node backend">
+      <span class="icon">🚪</span>
+      <div class="title">Backend Gateway</div>
+      <div class="detail">Express + TypeScript</div>
+      <span class="port">:3002</span>
+    </div>
+    <div class="arch-arrow"><span class="line">→</span><span class="label">HTTP<br>axios</span></div>
+    <div class="arch-node sidecar">
+      <span class="icon">🧪</span>
+      <div class="title">DeepEval Sidecar</div>
+      <div class="detail">FastAPI + Python</div>
+      <span class="port">:8000</span>
+    </div>
+    <div class="arch-arrow"><span class="line">→</span><span class="label">SDK<br>calls</span></div>
+    <div class="arch-node llm">
+      <span class="icon">🤖</span>
+      <div class="title">Groq / OpenAI</div>
+      <div class="detail">Judge LLM</div>
+      <span class="port">EVAL_MODEL</span>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Why three tiers instead of the frontend calling Python directly</strong>
+    The Express layer is a thin, stateless gateway — it re-validates fields per metric, enforces
+    feature-flag gates (<code>ENABLE_*</code>), normalizes response shape for the UI, and hosts
+    non-eval concerns (Excel parsing, HTML/Excel report generation). No LLM provider keys ever
+    reach Node — only the Python sidecar talks to Groq/OpenAI.
+  </div>
+</section>
+
+<section id="topology">
+  <h2><span class="num">2</span> Runtime topology &amp; ports</h2>
+  <div class="table-wrap">
+  <table>
+    <tr><th>Service</th><th>Actual port</th><th>Config source</th></tr>
+    <tr><td>Frontend dev server (Vite)</td><td><code>5174</code></td><td><code>frontend/vite.config.ts</code> (<code>server.port</code>)</td></tr>
+    <tr><td>Backend (Express)</td><td><code>3002</code></td><td>root <code>.env</code> → <code>PORT=3002</code>, read by <code>backend/src/config/env.ts</code></td></tr>
+    <tr><td>DeepEval sidecar (FastAPI)</td><td><code>8000</code></td><td>hardcoded in <code>deepeval_server.py</code>'s <code>uvicorn.run(..., port=8000)</code></td></tr>
+  </table>
+  </div>
+
+  <div class="callout warn">
+    <strong>Two things worth knowing if you're debugging connectivity</strong>
+    The frontend does <em>not</em> read <code>VITE_API_URL</code> dynamically — both
+    <code>App.tsx</code> and <code>services/llmEvalApi.ts</code> hardcode
+    <code>BACKEND_URL = 'http://localhost:3002'</code>. Vite's dev-server proxy
+    (<code>/api → http://localhost:3002</code>) is configured but effectively redundant since
+    the frontend calls the absolute URL directly. Also, <code>llm-eval-providers/.env</code>
+    has a <code>PORT=3002</code> line that does nothing — the sidecar's real port
+    (<code>8000</code>) is hardcoded in code, not read from env.
+  </div>
+
+  <h3>Environment files, by service</h3>
+  <ul>
+    <li><strong>Root <code>.env</code></strong> — read by <code>backend/src/index.ts</code> /
+    <code>config/env.ts</code>: backend port, feature flags, <code>DEEPEVAL_URL</code> and
+    friends.</li>
+    <li><strong><code>llm-eval-providers/.env</code></strong> — read directly by
+    <code>deepeval_server.py</code> via <code>load_dotenv()</code>: <code>EVAL_MODEL</code>,
+    <code>GROQ_API_KEY</code>/<code>OPENAI_API_KEY</code>, <code>IDK_HANDLING</code>, every
+    per-metric threshold/verdict-band override, custom G-Eval config.</li>
+  </ul>
+</section>
+
+<section id="dirmap">
+  <h2><span class="num">3</span> Directory map</h2>
+  <div class="card">
+<div class="tree">.
+├── <span class="c1">backend/src/</span>
+│   ├── index.ts                    <span class="c3"># bootstrap: CORS, JSON parsing, request logging,</span>
+│   │                                <span class="c3">  mounts routes under /api, /health, /api/status</span>
+│   ├── config/env.ts                <span class="c3"># ENV.* — port, DeepEval URLs, ENABLE_* flags,</span>
+│   │                                <span class="c3">  DISABLED_METRICS</span>
+│   ├── routes/
+│   │   ├── evalRoutes.ts            <span class="c3"># /eval-only, /eval-multiturn, /batch/*, /eval-report</span>
+│   │   └── customMetricsRoutes.ts   <span class="c3"># /custom-metrics* (separate API surface)</span>
+│   └── services/
+│       ├── evalClient.ts            <span class="c3"># axios → DeepEval sidecar (all evaluation calls)</span>
+│       ├── excelService.ts          <span class="c3"># parseExcelFile() via `xlsx`</span>
+│       └── reportService.ts         <span class="c3"># generateHTMLReport() / generateExcelReport()</span>
+│
+├── <span class="c2">frontend/src/</span>
+│   ├── App.tsx                      <span class="c3"># tab nav, fetches /api/status → FeatureFlags</span>
+│   ├── pages/                       <span class="c3"># LLMEvalPage, BatchEvalPage, MultiTurnEvalPage,</span>
+│   │                                <span class="c3">  GoldenDatasetPage, CustomMetricsPage</span>
+│   ├── components/
+│   │   ├── LLMEval/                 <span class="c3"># Form, ResponsePanel, ContextList, validation.ts</span>
+│   │   ├── BatchEval/               <span class="c3"># Upload → Preview → Convert → Select → Results → Report</span>
+│   │   ├── MultiTurnEval/           <span class="c3"># MultiTurnForm, MultiTurnResponsePanel</span>
+│   │   └── CustomMetrics/           <span class="c3"># CustomMetricsForm</span>
+│   └── services/                    <span class="c3"># llmEvalApi.ts, customMetricsApi.ts, configApi.ts</span>
+│
+└── <span class="c1">llm-eval-providers/</span>
+    └── deepeval_server.py           <span class="c3"># ~2600 lines: Pydantic models, GroqModel wrapper,</span>
+                                      <span class="c3">  MetricEvaluator, all route handlers</span></div>
+  </div>
+</section>
+
+<section id="core">
+  <h2><span class="num">4</span> Core abstraction: <code>MetricEvaluator</code> &amp; <code>GroqModel</code></h2>
+  <p>Everything in the sidecar routes through one class, <code>MetricEvaluator</code>
+  (<code>deepeval_server.py:665</code>), constructed fresh <strong>per request</strong> by
+  <code>init_evaluator_from_env()</code> (line 1508):</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="dot">1</div>
+      <p>Reads <code>EVAL_MODEL</code> from env and pattern-matches the prefix to pick a
+      provider: <code>llama-</code>, <code>mixtral-</code>, <code>gemma</code>,
+      <code>qwen</code>, <code>meta-llama</code>, <code>openai/</code> → <strong>Groq</strong>;
+      <code>gpt-</code> → <strong>OpenAI</strong>; anything unrecognized → falls back to
+      Groq <code>llama-3.3-70b-versatile</code>.</p>
+    </div>
+    <div class="step">
+      <div class="dot">2</div>
+      <p>For Groq, wraps the model in <code>GroqModel</code> (line 329) — a
+      <code>DeepEvalBaseLLM</code> subclass pointing the OpenAI SDK at
+      <code>https://api.groq.com/openai/v1</code>. This is the key compatibility shim:
+      DeepEval's metric classes expect DeepEval's/OpenAI's own model interface, so
+      <code>GroqModel.generate()</code> reimplements structured JSON output and includes a
+      <strong>schema-repair fallback</strong> (<code>_repair_single_field_schema</code>,
+      line 361) for when a smaller Groq model invents its own JSON field name instead of the
+      one DeepEval's schema requires.</p>
+    </div>
+    <div class="step">
+      <div class="dot">3</div>
+      <p>For OpenAI, uses DeepEval's built-in <code>GPTModel</code> directly — no wrapper needed.</p>
+    </div>
+    <div class="step">
+      <div class="dot">4</div>
+      <p><code>MetricEvaluator.evaluate(metric_name, ...)</code> (line 1391) validates
+      per-metric required fields, builds an <code>LLMTestCase</code>, then dispatches to one
+      <code>evaluate_&lt;metric&gt;()</code> method per metric, each constructing the matching
+      <code>deepeval.metrics.*</code> class with
+      <code>include_reason=True, async_mode=False, strict_mode=False</code> and calling
+      <code>metric.measure(test_case)</code>.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Why a new instance per request, not one shared evaluator</strong>
+    Token-usage accounting (<code>GroqModel.total_prompt_tokens</code> etc.) is tracked
+    per-instance so the <code>/eval</code> handler can report <code>total_usage</code> scoped to
+    just that request's LLM calls, via <code>_snapshot_usage()</code>/<code>_usage_since()</code>
+    baselining before/after each metric.
+  </div>
+</section>
+
+<section id="routes">
+  <h2><span class="num">5</span> Feature → route → sidecar map</h2>
+  <p>Every one of the five UI tabs follows the same shape: frontend page → backend route
+  (with a feature-flag guard) → sidecar endpoint.</p>
+
+  <div class="fanout-head">
+    <div>Frontend page</div><div></div><div>Backend route</div><div></div><div>Sidecar endpoint</div>
+  </div>
+  <div class="fanout">
+    <div class="fanout-row">
+      <div class="cell page">📊 LLMEvalPage</div><div class="arrow">→</div>
+      <div class="cell"><code>POST /api/eval-only</code></div><div class="arrow">→</div>
+      <div class="cell"><code>POST /eval</code></div>
+    </div>
+    <div class="fanout-row">
+      <div class="cell page">💬 MultiTurnEvalPage</div><div class="arrow">→</div>
+      <div class="cell"><code>POST /api/eval-multiturn</code></div><div class="arrow">→</div>
+      <div class="cell"><code>POST /eval/multiturn</code></div>
+    </div>
+    <div class="fanout-row">
+      <div class="cell page">🧩 CustomMetricsPage</div><div class="arrow">→</div>
+      <div class="cell"><code>POST /api/custom-metrics/geval</code></div><div class="arrow">→</div>
+      <div class="cell"><code>POST /custom-metrics/geval</code></div>
+    </div>
+    <div class="fanout-row">
+      <div class="cell page">✨ GoldenDatasetPage</div><div class="arrow">→</div>
+      <div class="cell"><code>POST /api/batch/generate-goldens</code></div><div class="arrow">→</div>
+      <div class="cell"><code>POST /generate-goldens</code></div>
+    </div>
+    <div class="fanout-row">
+      <div class="cell page">📁 BatchEvalPage</div><div class="arrow">→</div>
+      <div class="cell"><code>POST /api/batch/evaluate</code> <span style="color:var(--text-dim); font-size:12px;">(N rows)</span></div><div class="arrow">→</div>
+      <div class="cell"><code>POST /eval</code> <span style="color:var(--text-dim); font-size:12px;">(× N, sequential)</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="single">
+  <div class="flow-title"><span class="tag">Flow 1</span><h3>Single-turn evaluation — e.g. <code>faithfulness</code></h3></div>
+  <div class="steps">
+    <div class="step">
+      <div class="dot">1</div>
+      <span class="file">LLMEvalForm.tsx</span>
+      <p>User fills in <code>metric</code>, <code>query</code>, <code>output</code>,
+      <code>context[]</code>, <code>expected_output</code>.
+      <code>validateForm()</code> (<code>components/LLMEval/validation.ts</code>) enforces
+      per-metric required fields before submit.</p>
+    </div>
+    <div class="step">
+      <div class="dot">2</div>
+      <span class="file">services/llmEvalApi.ts</span>
+      <p><code>evaluateWithDeepEval()</code> filters empty context entries and
+      <code>POST</code>s to <code>http://localhost:3002/api/eval-only</code>.</p>
+    </div>
+    <div class="step">
+      <div class="dot">3</div>
+      <span class="file">routes/evalRoutes.ts</span>
+      <p>Checks <code>ENV.ENABLE_SINGLE_TURN</code>; normalizes <code>metric</code>
+      (string / array / <code>"all"</code>); rejects any metric in
+      <code>ENV.DISABLED_METRICS</code> (403); re-validates required fields per metric
+      (<code>output</code> required except for contextual metrics; <code>query</code>
+      required for pii_leakage/bias/hallucination; non-empty <code>context</code> required
+      for hallucination).</p>
+    </div>
+    <div class="step">
+      <div class="dot">4</div>
+      <span class="file">services/evalClient.ts</span>
+      <p><code>evalWithFields()</code> builds the payload and <code>POST</code>s to
+      <code>ENV.DEEPEVAL_URL</code> (<code>http://localhost:8000/eval</code>).</p>
+    </div>
+    <div class="step">
+      <div class="dot">5</div>
+      <span class="file">deepeval_server.py — POST /eval</span>
+      <p><code>evaluate_llm_response</code> (line 1574) expands <code>"all"</code> to the
+      full <code>SUPPORTED_METRICS</code> list, re-validates fields a third time, calls
+      <code>init_evaluator_from_env()</code> <strong>once</strong> for the whole request,
+      then loops over requested metrics calling <code>evaluator.evaluate(...)</code> for
+      each, appending a <code>MetricResult</code> to <code>results[]</code>.</p>
+    </div>
+    <div class="step">
+      <div class="dot">6</div>
+      <span class="file">get_verdict_for_metric() — line 485</span>
+      <p>Maps the raw 0–1 score to a human label using env-configurable HIGH/LOW cutoffs
+      (e.g. <code>FAITHFULNESS_VERDICT_HIGH=0.75</code> / <code>_LOW=0.3</code> →
+      <code>FAITHFUL</code>/<code>PARTIAL</code>/<code>NOT_FAITHFUL</code>). Bias,
+      hallucination, and PII leakage are "lower is better" — their HIGH/LOW comparisons are
+      inverted in code.</p>
+    </div>
+    <div class="step">
+      <div class="dot">7</div>
+      <p><code>EvalResponse</code> always returns <code>results: MetricResult[]</code>, plus
+      legacy top-level <code>metric_name</code>/<code>score</code>/<code>explanation</code>
+      populated from <code>results[0]</code> for backward compatibility.</p>
+    </div>
+    <div class="step">
+      <div class="dot">8</div>
+      <span class="file">routes/evalRoutes.ts</span>
+      <p>Extracts <code>verdict</code>/<code>detail</code>/<code>usage</code> from
+      <code>results[0]</code> (single metric) or passes the full <code>results[]</code>
+      through (multi-metric/<code>all</code>).</p>
+    </div>
+    <div class="step">
+      <div class="dot">9</div>
+      <span class="file">ResponsePanel.tsx</span>
+      <p>Renders score/verdict/explanation. For faithfulness, the <code>detail</code> object
+      (truths/claims/per-claim verdicts/idk-yes-no counts) drives a claim-level breakdown.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Faithfulness's IDK handling — the most involved metric</strong>
+    <code>evaluate_faithfulness()</code> (line 778) asks DeepEval to extract "truths" from
+    context and "claims" from output, verdicts each claim <code>yes</code>/<code>no</code>/<code>idk</code>,
+    then applies <code>IDK_HANDLING</code> (<code>yes</code>/<code>no</code>/<code>count</code>)
+    to decide how ambiguous claims affect the final score. If DeepEval extracts zero claims
+    (a small-model failure mode), it falls back to plain substring matching between output and context.
+  </div>
+</section>
+
+<section id="multi">
+  <div class="flow-title"><span class="tag">Flow 2</span><h3>Multi-turn evaluation</h3></div>
+  <p>Same shape as single-turn but keyed on a conversation instead of one query/output pair.</p>
+  <div class="steps">
+    <div class="step"><div class="dot">1</div><span class="file">MultiTurnForm.tsx</span>
+      <p>Collects an array of <code>{role, content, retrieval_context?}</code> turns (≥2 required).</p></div>
+    <div class="step"><div class="dot">2</div>
+      <p><code>POST /api/eval-multiturn</code> → Express validates turn count/shape and
+      <code>ENV.ENABLE_MULTI_TURN</code>.</p></div>
+    <div class="step"><div class="dot">3</div><span class="file">evalClient.ts</span>
+      <p><code>evalMultiTurn()</code> → sidecar's <code>POST /eval/multiturn</code>.</p></div>
+    <div class="step"><div class="dot">4</div>
+      <p><code>MetricEvaluator.create_conversational_test_case()</code> +
+      <code>evaluate_conversation_completeness()</code> — currently the only multi-turn
+      metric (<code>SUPPORTED_MULTITURN_METRICS</code> has just one entry).</p></div>
+  </div>
+</section>
+
+<section id="custom">
+  <div class="flow-title"><span class="tag">Flow 3</span><h3>Custom metrics (G-Eval)</h3></div>
+  <p>Deliberately isolated from the built-in metrics — its own route file
+  (<code>customMetricsRoutes.ts</code>), its own service functions, and its own sidecar
+  endpoints. This is DeepEval's <code>GEval</code> — free-text criteria evaluated by the
+  judge LLM, rather than a fixed metric class.</p>
+  <ul>
+    <li><code>GET /api/custom-metrics/config?metric_name=correctness</code> — prefills an
+    editable "scoring mechanism" (criteria, <code>evaluation_params</code>, threshold,
+    verdict cutoffs) resolved from <code>CUSTOM_GEVAL_&lt;NAME&gt;_*</code> env vars.</li>
+    <li><code>POST /api/custom-metrics/geval</code> — accepts optional per-call overrides
+    for <code>criteria</code>, <code>evaluation_steps</code> (mutually exclusive — GEval
+    allows only one), and <code>threshold</code>.</li>
+    <li>Response shape mirrors <code>/eval-only</code>'s single-metric shape exactly, so
+    <code>ResponsePanel.tsx</code> and report generation work unchanged for custom metrics too.</li>
+  </ul>
+</section>
+
+<section id="golden">
+  <div class="flow-title"><span class="tag">Flow 4</span><h3>Golden dataset generation</h3></div>
+  <div class="steps">
+    <div class="step"><div class="dot">1</div><span class="file">GoldenDatasetGenerator.tsx</span>
+      <p><code>POST /api/batch/generate-goldens</code> (gated on <code>ENV.ENABLE_GOLDEN_DATASET</code>).</p></div>
+    <div class="step"><div class="dot">2</div><span class="file">evalClient.ts</span>
+      <p><code>generateGoldens()</code> → sidecar's <code>POST /generate-goldens</code>.</p></div>
+    <div class="step"><div class="dot">3</div>
+      <p>Wraps DeepEval's <code>Synthesizer</code> around the same <code>evaluator.model</code>
+      used for scoring, calling <code>generate_goldens_from_contexts(contexts,
+      max_goldens_per_context, include_expected_output)</code>.</p></div>
+  </div>
+  <div class="callout warn">
+    <strong>Known quirk</strong>
+    DeepEval 3.8.9's <code>Synthesizer</code> throws an internal <code>IndexError</code> in
+    its progress bar if <code>max_goldens_per_context &lt; 2</code>, so the sidecar floors
+    that value at 2 regardless of what's requested (<code>deepeval_server.py:2162</code>).
+  </div>
+</section>
+
+<section id="batch">
+  <div class="flow-title"><span class="tag">Flow 5</span><h3>Batch evaluation</h3></div>
+  <p>The only flow driven by a file upload, and the only one that fans out to N independent
+  evaluation calls.</p>
+  <div class="steps">
+    <div class="step"><div class="dot">1</div><span class="file">ExcelUpload.tsx</span>
+      <p><code>multipart/form-data POST /api/batch/upload-excel</code>. <code>multer</code>
+      accepts only <code>.xlsx</code>/<code>.xls</code>, saves to a temp <code>uploads/</code>
+      dir; <code>excelService.ts#parseExcelFile()</code> reads every sheet via the
+      <code>xlsx</code> package. Temp file deleted ~1s later either way.</p></div>
+    <div class="step"><div class="dot">2</div><span class="file">DatasetPreview.tsx</span>
+      <p>Renders the parsed sheets.</p></div>
+    <div class="step"><div class="dot">3</div><span class="file">JsonConverter.tsx</span>
+      <p>Maps sheet rows into evaluation-ready records (<code>query</code>/<code>output</code>/
+      <code>context</code>/<code>expected_output</code>/a metric column, default name
+      <code>"Metrics"</code>).</p></div>
+    <div class="step"><div class="dot">4</div><span class="file">MetricSelector.tsx</span>
+      <p>Shows required/optional fields per metric — informational only; enforcement happens
+      server-side.</p></div>
+    <div class="step"><div class="dot">5</div>
+      <p><code>POST /api/batch/evaluate</code> (gated by <code>requireBatchEval</code>
+      middleware). For each row: reads the metric from <code>record[metricColumn]</code>,
+      normalizes it (lowercase, collapse whitespace/underscores), defaults to
+      <code>answer_relevancy</code> if missing/NA, validates required fields, calls
+      <code>evalWithFields()</code>.</p></div>
+    <div class="step"><div class="dot">6</div><span class="file">ReportGenerator.tsx</span>
+      <p><code>POST /api/batch/generate-report</code> → <code>generateHTMLReport()</code>
+      (self-contained HTML with inline charts) and/or <code>generateExcelReport()</code>
+      (Summary/Results/Data sheets). <code>reportType: "both"</code> returns both files
+      base64-encoded in one JSON response.</p></div>
+  </div>
+  <div class="callout">
+    <strong>Per-row fault isolation</strong>
+    Each row is evaluated independently and sequentially — a per-row try/catch means one
+    failing row (missing field, sidecar error) doesn't abort the batch; it's captured as
+    <code>{ rowIndex, error }</code> in the results array alongside successful rows. Token
+    usage is summed across all rows into a <code>totalUsage</code> object.
+  </div>
+</section>
+
+<section id="flags">
+  <h2><span class="num">6</span> Feature flags</h2>
+  <p><code>backend/src/config/env.ts</code> defines five independent boolean toggles
+  (default <strong>true</strong> unless explicitly <code>"false"</code>), plus
+  <code>DISABLED_METRICS</code>. Two layers enforce these: route guards (403 if disabled)
+  and UI tab visibility (<code>App.tsx</code> reads <code>/api/status</code> once on mount).</p>
+  <div class="flag-grid">
+    <div class="flag-card"><code>ENABLE_SINGLE_TURN</code><div class="desc">Gates <code>/api/eval-only</code> and the Single Evaluation tab.</div></div>
+    <div class="flag-card"><code>ENABLE_MULTI_TURN</code><div class="desc">Gates <code>/api/eval-multiturn</code> and the Multi-Turn tab.</div></div>
+    <div class="flag-card"><code>ENABLE_CUSTOM_METRICS</code><div class="desc">Gates all <code>/api/custom-metrics*</code> routes and the G-Eval tab.</div></div>
+    <div class="flag-card"><code>ENABLE_BATCH_EVAL</code><div class="desc">Gates upload/evaluate/report routes via <code>requireBatchEval</code> middleware.</div></div>
+    <div class="flag-card"><code>ENABLE_GOLDEN_DATASET</code><div class="desc">Gates <code>/api/batch/generate-goldens</code> and the Golden Dataset tab.</div></div>
+    <div class="flag-card"><code>DISABLED_METRICS</code><div class="desc">Comma-separated metric names hidden from dropdowns and rejected server-side if requested directly.</div></div>
+  </div>
+  <p style="margin-top:14px;">The UI defaults <em>all</em> tabs to enabled before the
+  <code>/api/status</code> fetch resolves (or if unreachable) — route guards are the real
+  enforcement, tab visibility is cosmetic. If the active tab becomes disabled,
+  <code>firstEnabledPage()</code> picks the next tab by priority:
+  <code>llm-eval → batch-eval → multi-turn-eval → golden-dataset → custom-metrics</code>.</p>
+</section>
+
+<section id="metrics">
+  <h2><span class="num">7</span> Metrics reference</h2>
+  <div class="table-wrap">
+  <table>
+    <tr><th>Metric key</th><th>DeepEval class</th><th>Required fields</th><th>Direction</th></tr>
+    <tr><td><code>faithfulness</code></td><td>FaithfulnessMetric</td><td>output, context</td><td class="higher-better">higher = better</td></tr>
+    <tr><td><code>answer_relevancy</code></td><td>AnswerRelevancyMetric</td><td>output, query</td><td class="higher-better">higher = better</td></tr>
+    <tr><td><code>contextual_precision</code></td><td>ContextualPrecisionMetric</td><td>query, context, expected_output</td><td class="higher-better">higher = better</td></tr>
+    <tr><td><code>contextual_recall</code></td><td>ContextualRecallMetric</td><td>query, context, expected_output</td><td class="higher-better">higher = better</td></tr>
+    <tr><td><code>pii_leakage</code></td><td>PIILeakageMetric</td><td>output, query</td><td class="lower-better">lower = better</td></tr>
+    <tr><td><code>bias</code></td><td>BiasMetric</td><td>output, query</td><td class="lower-better">lower = better</td></tr>
+    <tr><td><code>hallucination</code></td><td>HallucinationMetric</td><td>output, query, context</td><td class="lower-better">lower = better</td></tr>
+    <tr><td><code>ragas</code></td><td>Composite: Faithfulness + ContextualPrecision + ContextualRecall (avg)</td><td>query, context, output, expected_output</td><td class="higher-better">higher = better</td></tr>
+    <tr><td><code>conversation_completeness</code></td><td>DeepEval conversational metric</td><td>turns (≥2)</td><td class="higher-better">higher = better</td></tr>
+    <tr><td>custom G-Eval (e.g. <code>correctness</code>)</td><td>GEval</td><td>output (+ configurable params)</td><td class="higher-better">higher = better</td></tr>
+  </table>
+  </div>
+  <p style="margin-top:12px;">All verdict-band cutoffs and DeepEval's internal pass/fail
+  <code>threshold</code> are env-overridable per metric in
+  <code>llm-eval-providers/.env</code> (<code>*_VERDICT_HIGH</code>/<code>*_VERDICT_LOW</code>,
+  <code>*_THRESHOLD</code>) — behavior is identical whether these are set or left at their
+  hardcoded defaults.</p>
+</section>
+
+<section id="gaps">
+  <h2><span class="num">8</span> Known gaps <span style="font-size:13px; color:var(--text-dim); font-weight:400;">(confirmed in code)</span></h2>
+  <div class="gaps">
+    <div class="gap-item"><strong>provider</strong> is accepted but ignored — every request
+    shape carries a <code>provider</code> field defaulting to <code>"groq"</code>, but
+    <code>init_evaluator_from_env()</code> decides Groq vs. OpenAI purely from the sidecar's
+    <code>EVAL_MODEL</code> env var.</div>
+    <div class="gap-item">Frontend hardcodes <code>http://localhost:3002</code> in
+    <code>App.tsx</code> and every <code>services/*.ts</code> file rather than reading
+    <code>VITE_API_URL</code>.</div>
+    <div class="gap-item"><code>llm-eval-providers/.env</code>'s <code>PORT=3002</code> is
+    dead config — <code>deepeval_server.py</code> hardcodes port <code>8000</code>.</div>
+    <div class="gap-item">Root <code>package.json</code>'s <code>dev:python</code>/<code>start:python</code>
+    scripts point at a nonexistent <code>python/ragas_server.py</code> — leftover from an
+    earlier RAGAS-based layout. Use <code>cd llm-eval-providers &amp;&amp; python deepeval_server.py</code>.</div>
+    <div class="gap-item">No automated test suite for backend, frontend, or the sidecar —
+    validation has been manual API calls (see <code>postman-collection.json</code>).</div>
+    <div class="gap-item">Report generation's <code>"both"</code> mode returns base64 JSON,
+    not a zip, despite a code comment suggesting a zip was the original intent.</div>
+  </div>
+</section>
+
+<footer>
+  Generated from the current state of <code>testleaf-llm-evaluation-metrics-deepeval</code>.
+  See <code>README.md</code> for setup instructions and full API payload reference.
+</footer>
+
+</div>
+</body>
+</html>
